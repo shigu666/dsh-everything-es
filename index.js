@@ -13,6 +13,7 @@
  * execution and the effective working directory use the Host's services so the
  * tool follows the same subprocess policy as built-in tools.
  */
+import { isAbsolute, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { esCandidates, nativePath, positiveInt } from './lib/core.js';
@@ -35,7 +36,7 @@ const { defineTool } = await import(
 );
 
 /** Services used by the tool. */
-export const inject = ['tools', 'subprocess'];
+export const inject = ['tools', 'subprocess', 'workingDirectory'];
 
 /** Row config; volatile fields are what the settings form edits live. */
 export const Config = z.object({
@@ -104,6 +105,13 @@ async function resolveEs(ctx, configured, signal) {
   };
 }
 
+/** Resolve an optional relative model path against the session workdir. */
+function resolveSearchRoot(path, workdir) {
+  if (typeof path !== 'string' || path.trim() === '') return workdir;
+  const normalized = nativePath(path);
+  return isAbsolute(normalized) ? normalized : resolve(workdir, normalized);
+}
+
 /** Register `search_files` when Everything is usable on this platform. */
 export function apply(ctx, rawConfig = {}) {
   if (process.platform !== 'win32') return;
@@ -170,12 +178,12 @@ export function apply(ctx, rawConfig = {}) {
 
         const limit = positiveInt(args.max_results, maxResults(), 1000);
         const timeout = timeoutMs();
-        const workdir = exec.agent?.session?.header?.cwd ?? process.cwd();
+        const workdir = exec.agent !== undefined
+          ? await ctx.workingDirectory.ensure(exec.agent, exec.signal)
+          : process.cwd();
         exec.signal.throwIfAborted();
 
-        const root = typeof args.path === 'string' && args.path.trim() !== ''
-          ? nativePath(args.path)
-          : workdir;
+        const root = resolveSearchRoot(args.path, workdir);
         const result = await searchEverything({
           subprocess: ctx.subprocess,
           esPath: resolved.path,
