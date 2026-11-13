@@ -41,8 +41,8 @@ export const inject = ['tools', 'subprocess', 'workingDirectory'];
 /** Row config; volatile fields are what the settings form edits live. */
 export const Config = z.object({
   esPath: z.string().default('').volatile(),
-  maxResults: z.number().default(50).volatile(),
-  timeoutMs: z.number().default(15000).volatile(),
+  maxResults: z.number().min(1).max(1000).step(1).default(50).volatile(),
+  timeoutMs: z.number().min(1).max(120000).step(1).default(15000).volatile(),
 });
 
 /** Read one config field, handling schemastery volatile getters. */
@@ -124,7 +124,7 @@ export function apply(ctx, rawConfig = {}) {
     defineTool({
       name: 'search_files',
       description:
-        'Find files and folders by NAME or PATH through the Everything index (Windows). This is a fast metadata lookup, not a content search: it returns paths whose names match the query and does not read file contents. Use rg or grep for content. Each result is one full Windows path on its own line.',
+        'Find files and folders by NAME or PATH through the Everything index (Windows). This is a fast metadata lookup, not a content search: it returns paths whose names match the query and does not read file contents. Use rg or grep for content. Each result is one full Windows path on its own line. Results are capped; the result reports when the cap was reached and more matches may exist.',
       parameters: {
         query: {
           type: 'string',
@@ -156,15 +156,22 @@ export function apply(ctx, rawConfig = {}) {
               type: 'integer',
               required: true,
             },
+            truncated: {
+              type: 'boolean',
+              required: true,
+            },
             note: { type: 'string' },
           },
         },
-        render: (_args, value) => [
-          {
-            type: 'text',
-            text: value.paths.length > 0 ? value.paths.join('\\n') : (value.note ?? 'No files matched.'),
-          },
-        ],
+        render: (_args, value) => {
+          const body = value.paths.length > 0
+            ? value.paths.join('\n')
+            : (value.note ?? 'No files matched.');
+          const truncation = value.truncated === true
+            ? '\n\n[Result limit reached; refine the query or path to see more matches.]'
+            : '';
+          return [{ type: 'text', text: `${body}${truncation}` }];
+        },
       },
       async execute(args, exec) {
         exec.signal.throwIfAborted();
@@ -198,6 +205,7 @@ export function apply(ctx, rawConfig = {}) {
         return {
           paths: result.paths,
           total: result.paths.length,
+          truncated: result.truncated,
           ...(result.paths.length === 0 ? { note: 'No files matched (Everything index).' } : {}),
         };
       },
