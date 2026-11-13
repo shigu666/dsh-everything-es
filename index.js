@@ -9,16 +9,14 @@
  *
  * Packages come from the running dsh installation: a profile-installed bundle
  * resolves modules from the profile, so the plugin borrows the Host's own
- * schemastery and tool helper instead of carrying a dependency tree.
+ * schemastery and tool helper instead of carrying a dependency tree. Process
+ * execution and the effective working directory use the Host's services so the
+ * tool follows the same subprocess policy as built-in tools.
  */
-import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { delimiter, join } from 'node:path';
-import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
-
-const execFileAsync = promisify(execFile);
+import { esCandidates, nativePath, positiveInt } from './lib/core.js';
+import { searchEverything } from './lib/run-es.js';
 
 /** Load one module from the running dsh installation. */
 function hostRequire() {
@@ -37,7 +35,7 @@ const { defineTool } = await import(
 );
 
 /** Services used by the tool. */
-export const inject = ['tools'];
+export const inject = ['tools', 'subprocess'];
 
 /** Row config; volatile fields are what the settings form edits live. */
 export const Config = z.object({
@@ -45,54 +43,6 @@ export const Config = z.object({
   maxResults: z.number().default(50).volatile(),
   timeoutMs: z.number().default(15000).volatile(),
 });
-
-/** Well-known Everything CLI locations, tried when no path is configured. */
-const ES_CANDIDATES = [
-  'D:/Program Files/Everything/es.exe',
-  'C:/Program Files/Everything/es.exe',
-  'C:/Program Files (x86)/Everything/es.exe',
-];
-
-/** Turn a Git Bash style `/d/...` path into a Windows path. */
-function nativePath(value) {
-  const trimmed = String(value).trim();
-  if (process.platform !== 'win32') return trimmed;
-  const posix = /^\/([a-zA-Z])\/(.*)$/.exec(trimmed);
-  return posix ? `${posix[1].toUpperCase()}:/${posix[2]}` : trimmed;
-}
-
-/** Find `es.exe` on the process PATH. */
-function findOnPath() {
-  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
-    if (dir === '') continue;
-    for (const name of ['es.exe', 'es']) {
-      const candidate = join(dir, name);
-      if (existsSync(candidate)) return candidate;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Resolve the Everything CLI: configured path first, then the well-known
- * locations, then PATH. Returns an error string instead of throwing so the
- * tool can explain what to configure.
- */
-function resolveEs(configured) {
-  if (typeof configured === 'string' && configured.trim() !== '') {
-    const path = nativePath(configured);
-    return existsSync(path)
-      ? { path }
-      : { error: `Everything es was configured at "${configured}", but that file does not exist.` };
-  }
-  for (const candidate of ES_CANDIDATES) if (existsSync(candidate)) return { path: candidate };
-  const onPath = findOnPath();
-  if (onPath !== undefined) return { path: onPath };
-  return {
-    error:
-      'Everything es was not found. Install Everything with its CLI, or set the esPath setting to es.exe (for example D:/Program Files/Everything/es.exe).',
-  };
-}
 
 /** Read one config field, handling schemastery volatile getters. */
 function valueOf(field, fallback) {
@@ -106,15 +56,56 @@ function valueOf(field, fallback) {
   return field ?? fallback;
 }
 
-/** Clamp one positive integer setting. */
-function positiveInt(value, fallback, max) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < 1) return fallback;
-  return Math.min(Math.floor(number), max);
+/**
+ * Resolve `es.exe` through the Host subprocess service's execution world.
+ *
+ * A configured path is authoritative: if it is invalid we report that instead
+ * of silently falling back to another installation. Empty configuration tries
+ * the standard Windows locations, then PATH.
+ *
+ * @param {object} ctx Host plugin context
+ * @param {unknown} configured configured `esPath`
+ * @param {AbortSignal} signal caller cancellation
+ * @returns {Promise<{path: string} | {error: string}>}
+ */
+async function resolveEs(ctx, configured, signal) {
+  if (typeof configured === 'string' && configured.trim() !== '') {
+    const path = nativePath(configured);
+    try {
+      return { path: await ctx.subprocess.resolveExecutable(path, undefined, signal) };
+    } catch (error) {
+      signal?.throwIfAborted();
+      const detail = error instanceof Error ? ` ${error.message}` : '';
+      return {
+        error: `Everything es was configured at "${configured}", but that file is not a usable executable.${detail}`,
+      };
+    }
+  }
+
+  for (const candidate of esCandidates()) {
+    try {
+      return { path: await ctx.subprocess.resolveExecutable(candidate, undefined, signal) };
+    } catch {
+      signal?.throwIfAborted();
+    }
+  }
+
+  for (const name of ['es.exe', 'es']) {
+    try {
+      return { path: await ctx.subprocess.resolveExecutable(name, undefined, signal) };
+    } catch {
+      signal?.throwIfAborted();
+    }
+  }
+
+  return {
+    error:
+      'Everything es was not found. Install Everything with its CLI, or set the esPath setting to es.exe (for example D:/Program Files/Everything/es.exe).',
+  };
 }
 
 /** Register `search_files` when Everything is usable on this platform. */
-export function apply(ctx, rawConfig) {
+export function apply(ctx, rawConfig = {}) {
   if (process.platform !== 'win32') return;
 
   const configuredPath = () => valueOf(rawConfig.esPath, '');
@@ -136,7 +127,7 @@ export function apply(ctx, rawConfig) {
         path: {
           type: 'string',
           description:
-            'Optional folder to restrict the search to. Defaults to the Session working directory. Absolute Windows paths and /d/... Git Bash paths are accepted.',
+            'Optional folder to restrict the search to. Defaults to the current Session working directory. Absolute Windows paths and /d/... Git Bash paths are accepted.',
         },
         max_results: {
           type: 'number',
@@ -163,41 +154,44 @@ export function apply(ctx, rawConfig) {
         render: (_args, value) => [
           {
             type: 'text',
-            text: value.paths.length > 0 ? value.paths.join('\n') : (value.note ?? 'No files matched.'),
+            text: value.paths.length > 0 ? value.paths.join('\\n') : (value.note ?? 'No files matched.'),
           },
         ],
       },
       async execute(args, exec) {
-        const resolved = resolveEs(configuredPath());
+        exec.signal.throwIfAborted();
+
+        if (args.query.trim() === '') {
+          throw new Error('search_files query must not be empty.');
+        }
+
+        const resolved = await resolveEs(ctx, configuredPath(), exec.signal);
         if (resolved.error !== undefined) throw new Error(resolved.error);
+
         const limit = positiveInt(args.max_results, maxResults(), 1000);
+        const timeout = timeoutMs();
+        const workdir = exec.agent?.session?.header?.cwd ?? process.cwd();
+        exec.signal.throwIfAborted();
+
         const root = typeof args.path === 'string' && args.path.trim() !== ''
           ? nativePath(args.path)
-          : exec.agent?.session?.header?.cwd;
-        const command = [resolved.path, '-n', String(limit)];
-        if (typeof root === 'string' && root !== '') command.push('-path', root);
-        command.push(args.query);
-        try {
-          const { stdout } = await execFileAsync(command[0], command.slice(1), {
-            timeout: timeoutMs(),
-            windowsHide: true,
-            maxBuffer: 8 * 1024 * 1024,
-            signal: exec.signal,
-          });
-          const paths = stdout
-            .split(/\r?\n/u)
-            .map((line) => line.trim())
-            .filter((line) => line !== '');
-          return {
-            paths,
-            total: paths.length,
-            ...(paths.length === 0 ? { note: 'No files matched (Everything index).' } : {}),
-          };
-        } catch (error) {
-          if (error?.code === 'ENOENT') throw new Error(`Everything es could not be started: ${resolved.path}`);
-          if (error?.killed === true) throw new Error(`Everything es did not answer within ${timeoutMs()} ms.`);
-          throw new Error(`Everything es failed: ${error?.message ?? error}`);
-        }
+          : workdir;
+        const result = await searchEverything({
+          subprocess: ctx.subprocess,
+          esPath: resolved.path,
+          query: args.query,
+          cwd: workdir,
+          root,
+          limit,
+          timeoutMs: timeout,
+          signal: exec.signal,
+        });
+
+        return {
+          paths: result.paths,
+          total: result.paths.length,
+          ...(result.paths.length === 0 ? { note: 'No files matched (Everything index).' } : {}),
+        };
       },
     }),
   );

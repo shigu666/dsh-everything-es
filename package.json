@@ -24,6 +24,8 @@
     "cordis.patch.yml",
     "README.md",
     "LICENSE",
+    "lib/core.js",
+    "lib/run-es.js",
     "locale/*.json",
     "icon.svg"
   ],
