@@ -222,25 +222,11 @@ setFailed(false);
 setError("");
 };
 
-const resetField = async (name) => {
-setSaving(true);
+const resetField = (name) => {
+setDraft((previous) => ({ ...previous, [name]: "" }));
+setDirty(true);
 setFailed(false);
 setError("");
-try {
-const accepted = await form.unset(name);
-if (!accepted) {
-setFailed(true);
-setError(t("saveFailed"));
-return;
-}
-const current = form.getSnapshot();
-setDraft((previous) => ({ ...previous, [name]: fieldText(current.value, name) }));
-} catch (cause) {
-setFailed(true);
-setError(cause instanceof Error ? cause.message : t("saveFailed"));
-} finally {
-setSaving(false);
-}
 };
 
 return h(
