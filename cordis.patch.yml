@@ -1,0 +1,10 @@
+# Everything search: a Host row with the es tool and its settings namespace.
+- insert:
+    - id: everything-search
+      name: 'dsh-everything-es'
+      config:
+        # Empty means auto-detect: D:\Program Files\Everything\es.exe,
+        # C:\Program Files\Everything\es.exe, then `es` on PATH.
+        esPath: ''
+        maxResults: 50
+        timeoutMs: 15000

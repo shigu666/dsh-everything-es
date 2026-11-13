@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Everything search",
+    "description": "Adds a search_files tool that looks up file and folder names through Everything's es CLI on Windows."
+  }
+}
