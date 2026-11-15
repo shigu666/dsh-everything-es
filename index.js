@@ -13,10 +13,11 @@
  * execution and the effective working directory use the Host's services so the
  * tool follows the same subprocess policy as built-in tools.
  */
-import { isAbsolute, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
-import { esCandidates, nativePath, positiveInt } from './lib/core.js';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { nativePath, positiveInt } from './lib/core.js';
+import { resolveEs } from './lib/resolve-es.js';
 import { searchEverything } from './lib/run-es.js';
 
 /** Load one module from the running dsh installation. */
@@ -34,6 +35,9 @@ const z = schemastery?.default ?? schemastery;
 const { defineTool } = await import(
   pathToFileURL(required.resolve('@deepseek-ai/dsh-tools')).href
 );
+
+/** Architecture-specific es.exe builds shipped in this package. */
+const BUNDLED_ES_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), 'lib', 'es');
 
 /** Services used by the tool. */
 export const inject = ['tools', 'subprocess', 'workingDirectory'];
@@ -55,54 +59,6 @@ function valueOf(field, fallback) {
     }
   }
   return field ?? fallback;
-}
-
-/**
- * Resolve `es.exe` through the Host subprocess service's execution world.
- *
- * A configured path is authoritative: if it is invalid we report that instead
- * of silently falling back to another installation. Empty configuration tries
- * the standard Windows locations, then PATH.
- *
- * @param {object} ctx Host plugin context
- * @param {unknown} configured configured `esPath`
- * @param {AbortSignal} signal caller cancellation
- * @returns {Promise<{path: string} | {error: string}>}
- */
-async function resolveEs(ctx, configured, signal) {
-  if (typeof configured === 'string' && configured.trim() !== '') {
-    const path = nativePath(configured);
-    try {
-      return { path: await ctx.subprocess.resolveExecutable(path, undefined, signal) };
-    } catch (error) {
-      signal?.throwIfAborted();
-      const detail = error instanceof Error ? ` ${error.message}` : '';
-      return {
-        error: `Everything es was configured at "${configured}", but that file is not a usable executable.${detail}`,
-      };
-    }
-  }
-
-  for (const candidate of esCandidates()) {
-    try {
-      return { path: await ctx.subprocess.resolveExecutable(candidate, undefined, signal) };
-    } catch {
-      signal?.throwIfAborted();
-    }
-  }
-
-  for (const name of ['es.exe', 'es']) {
-    try {
-      return { path: await ctx.subprocess.resolveExecutable(name, undefined, signal) };
-    } catch {
-      signal?.throwIfAborted();
-    }
-  }
-
-  return {
-    error:
-      'Everything es was not found. Install Everything with its CLI, or set the esPath setting to es.exe (for example D:/Program Files/Everything/es.exe).',
-  };
 }
 
 /** Resolve an optional relative model path against the session workdir. */
@@ -180,7 +136,13 @@ export function apply(ctx, rawConfig = {}) {
           throw new Error('search_files query must not be empty.');
         }
 
-        const resolved = await resolveEs(ctx, configuredPath(), exec.signal);
+        const resolved = await resolveEs({
+          configured: configuredPath(),
+          subprocess: ctx.subprocess,
+          signal: exec.signal,
+          bundledRoot: BUNDLED_ES_ROOT,
+          arch: process.arch,
+        });
         if (resolved.error !== undefined) throw new Error(resolved.error);
 
         const limit = positiveInt(args.max_results, maxResults(), 1000);

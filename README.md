@@ -25,7 +25,9 @@ The plugin is Windows-only; on other platforms it registers no tool.
 - Everything installed (the GUI and/or its service), with the drives you search indexed.
 - The Everything CLI `es.exe`, typically installed next to `Everything.exe`
   (`D:\Program Files\Everything\es.exe` in the default layout), with `-export-txt` and
-  `-utf8-bom` support (current Everything 1.x).
+  `-utf8-bom` support (current Everything 1.x). A separate CLI installation is optional: when
+  no `es.exe` is configured or discovered, the plugin uses the architecture-matched build
+  bundled under `lib/es/` (x64, x86, ARM64, or ARM32).
 
 ## Settings
 
@@ -33,7 +35,7 @@ The plugin is Windows-only; on other platforms it registers no tool.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `esPath` | empty | Explicit `es.exe` path (`D:/...` or Git Bash `/d/...`). Empty tries the Windows Program Files locations, `D:\Program Files\Everything`, `C:\Program Files\Everything`, `C:\Program Files (x86)\Everything`, then PATH. |
+| `esPath` | empty | Explicit `es.exe` path (`D:/...` or Git Bash `/d/...`). Empty tries the Windows Program Files locations, `D:\Program Files\Everything`, `C:\Program Files\Everything`, `C:\Program Files (x86)\Everything`, then PATH, then the architecture-matched `es.exe` bundled with the plugin. |
 | `maxResults` | `50` | Maximum paths one search returns (1–1000). |
 | `timeoutMs` | `15000` | How long one `es` query may run (1–120000 ms). |
 
@@ -78,6 +80,11 @@ become an `es.exe` option.
 The tool is registered in the Host tool registry, so every agent preset that composes the base tool
 services sees it; the plugin never mounts a preset or touches another plugin's rows.
 
+The package includes Everything's CLI builds for x64, x86, ARM64, and ARM32. The resolver selects
+the build matching the running DSH process (`process.arch`); ARM64 and ARM32 additionally try their
+Windows emulation fallback (x64 and x86 respectively). Bundled binaries from voidtools are third-party
+software and are not covered by this package's MIT license.
+
 ## Development
 
 ```text
@@ -85,6 +92,7 @@ node --test
 ```
 
 The unit tests cover argument construction and option-injection protection, UTF-8/CRLF path parsing,
-truncation, cancellation, timeout handling, and subprocess errors.
+truncation, cancellation, timeout handling, subprocess errors, executable discovery ordering, and
+architecture-specific bundled fallback selection.
 
 MIT licensed.

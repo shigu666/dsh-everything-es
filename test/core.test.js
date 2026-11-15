@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildEsArgs,
+  bundledEsArchCandidates,
+  bundledEsCandidates,
   esCandidates,
   literalSearchArg,
   nativePath,
@@ -77,6 +79,21 @@ test('esCandidates includes environment-derived Program Files locations', () => 
   assert.ok(candidates.includes('E:/Program Files/Everything/es.exe'));
   assert.ok(candidates.includes('E:/Program Files (x86)/Everything/es.exe'));
   assert.equal(new Set(candidates).size, candidates.length);
+});
+
+test('bundledEsArchCandidates picks compatible Windows builds', () => {
+  assert.deepEqual(bundledEsArchCandidates('x64'), ['x64']);
+  assert.deepEqual(bundledEsArchCandidates('ia32'), ['x86']);
+  assert.deepEqual(bundledEsArchCandidates('arm64'), ['arm64', 'x64']);
+  assert.deepEqual(bundledEsArchCandidates('arm'), ['arm', 'x86']);
+  assert.deepEqual(bundledEsArchCandidates('mips'), []);
+});
+
+test('bundledEsCandidates builds architecture-specific es.exe paths', () => {
+  const candidates = bundledEsCandidates('C:/plugin/lib/es', 'arm64');
+  assert.equal(candidates.length, 2);
+  assert.match(candidates[0], /arm64[\\/]es\.exe$/u);
+  assert.match(candidates[1], /x64[\\/]es\.exe$/u);
 });
 
 test('nativePath converts Git Bash drive paths on Windows', () => {
