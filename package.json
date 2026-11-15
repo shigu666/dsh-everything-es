@@ -3,8 +3,16 @@
   "version": "0.3.1",
   "private": true,
   "type": "module",
-  "description": "Fast file-name search for DeepSeek Harness on Windows through Everything's es CLI.",
+  "description": "Windows-only file-name search for DeepSeek Harness, powered by the es CLI of a locally installed and running Everything.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shigu666/dsh-everything-es.git"
+  },
+  "homepage": "https://github.com/shigu666/dsh-everything-es#readme",
+  "bugs": {
+    "url": "https://github.com/shigu666/dsh-everything-es/issues"
+  },
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -23,6 +31,7 @@
     "client.js",
     "cordis.patch.yml",
     "README.md",
+    "README.en.md",
     "LICENSE",
     "lib/core.js",
     "lib/resolve-es.js",
