@@ -58,5 +58,8 @@
   "scripts": {
     "test": "node --test",
     "test:integration": "powershell -NoProfile -ExecutionPolicy Bypass -File test/es-integration.ps1"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.5"
   }
 }

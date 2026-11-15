@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
-test('package does not pin a DSH engine range', () => {
-  assert.equal(Object.hasOwn(pkg, 'engines'), false);
+test('package keeps the minimum DSH version without an upper bound', () => {
+  assert.equal(pkg.engines?.dsh, '>=0.2.1-rc.5');
 });
 
 test('plugin details link to the repository README instead of rendering it', async () => {
