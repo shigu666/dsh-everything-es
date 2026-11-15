@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Everything 搜索",
-    "description": "在 Windows 上通过 Everything 的 es 命令行按文件名/路径查找，提供 search_files 工具。"
+    "description": "在 Windows 上通过 Everything 的 es 命令行按文件名/路径查找，提供 search_files 工具。需本机已安装并运行 Everything。"
   }
 }

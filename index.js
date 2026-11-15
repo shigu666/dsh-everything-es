@@ -73,7 +73,7 @@ export function apply(ctx, rawConfig = {}) {
     defineTool({
       name: 'search_files',
       description:
-        'Find files and folders by NAME or PATH through the Everything index (Windows). This is a fast metadata lookup, not a content search: it returns paths whose names match the query and does not read file contents. Use rg or grep for content. Each result is one full Windows path on its own line. Results are capped; the result reports when the cap was reached and more matches may exist.',
+        'Find files and folders by NAME or PATH through the Everything index on Windows. Requires Everything to already be installed and running on the local machine. This is a fast metadata lookup, not a content search: it returns paths whose names match the query and does not read file contents. Use rg or grep for content. Each result is one full Windows path on its own line. Results are capped; the result reports when the cap was reached and more matches may exist.',
       parameters: {
         query: {
           type: 'string',

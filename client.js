@@ -12,7 +12,7 @@ const NS = "settings.everythingSearch";
 /** English copy. */
 const en = {
 title: "Everything search",
-description: "File-name lookup through Everything's es CLI: set where es.exe lives and how many paths one search may return.",
+description: "Windows-only file-name lookup through Everything's es CLI. Requires a locally installed and running Everything; configure the es.exe path and result limit here.",
 esPath: "es.exe path",
 esPathHint: "For example C:/Program Files/Everything/es.exe. Leave empty to try the usual install folders and PATH, then the bundled es.exe.",
 maxResults: "Results per search",
@@ -34,7 +34,7 @@ applyHint: "Saved values apply to the running Agent on its next search; no resta
 /** Simplified Chinese copy. */
 const zh = {
 title: "Everything 搜索",
-description: "通过 Everything 的 es 命令行按文件名/路径查找；设置 es.exe 位置与单次返回上限。",
+description: "在 Windows 上通过 Everything 的 es 命令行按文件名/路径查找；需本机已安装并运行 Everything。可在这里设置 es.exe 路径与单次返回上限。",
 esPath: "es.exe 路径",
 esPathHint: "例如 C:/Program Files/Everything/es.exe。留空则依次尝试常见安装目录、PATH，最后使用插件内置的 es.exe。",
 maxResults: "单次返回数量",
