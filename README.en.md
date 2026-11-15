@@ -115,7 +115,7 @@ services sees it; the plugin never mounts a preset or touches another plugin's r
 The package includes Everything CLI builds for x64, x86, ARM64, and ARM32. The resolver selects the
 build matching the running DSH process (`process.arch`); ARM64 and ARM32 additionally try their
 Windows emulation fallback (x64 and x86 respectively). Bundled binaries from voidtools are third-party
-software and are not covered by this package's MIT license.
+software and are not covered by this package's MPL 2.0 license.
 
 ## Development and testing
 
@@ -132,4 +132,4 @@ The unit tests cover argument construction and option-injection protection, UTF-
 truncation, cancellation, timeout handling, subprocess errors, executable discovery ordering, and
 architecture-specific bundled fallback selection.
 
-MIT licensed.
+Licensed under the [Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/).

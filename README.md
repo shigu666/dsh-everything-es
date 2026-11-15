@@ -103,7 +103,7 @@ Everything 的 `es.exe` 使用 Windows ANSI 代码页输出。为保留非 ASCII
 
 插件包含 Everything 官方 CLI 的 x64、x86、ARM64 和 ARM32 版本。解析器会根据运行 DSH 进程的
 `process.arch` 选择对应构建；ARM64 和 ARM32 还会分别尝试 x64 和 x86 的 Windows 模拟回退。
-内置二进制来自 voidtools，属于第三方软件，不适用本项目的 MIT 许可证。
+内置二进制来自 voidtools，属于第三方软件，不适用本项目的 MPL 2.0 许可证。
 
 ## 开发与测试
 
@@ -118,4 +118,4 @@ npm run test:integration
 单元测试覆盖参数构造与选项注入防护、UTF-8/CRLF 路径解析、截断、取消、超时、子进程错误、
 可执行文件查找顺序，以及不同架构的内置回退选择。
 
-本项目使用 MIT 许可证。
+本项目使用 [MPL 2.0（Mozilla Public License 2.0）](https://mozilla.org/MPL/2.0/) 许可证。

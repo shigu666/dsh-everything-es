@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Windows-only file-name search for DeepSeek Harness, powered by the es CLI of a locally installed and running Everything.",
-  "license": "MIT",
+  "license": "MPL-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shigu666/dsh-everything-es.git"
