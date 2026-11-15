@@ -62,7 +62,7 @@ dsh plugin --profile web remove dsh-everything-es
 
 | 字段 | 默认值 | 说明 |
 |---|---|---|
-| `esPath` | 空 | 显式的 `es.exe` 路径（`D:/...` 或 Git Bash 风格的 `/d/...`）。填写后只使用该路径。留空时依次尝试 Windows Program Files 常见位置、`D:\Program Files\Everything`、`C:\Program Files\Everything`、`C:\Program Files (x86)\Everything`、`PATH`，最后使用插件内置的 `es.exe`。 |
+| `esPath` | 空 | 显式的 `es.exe` 路径（`D:/...` 或 Git Bash 风格的 `/d/...`）。填写后只使用该路径。留空时依次尝试 Windows Program Files 常见位置、`D:\Program Files\Everything`、`C:\Program Files\Everything`、`D:\Program Files (x86)\Everything`、`C:\Program Files (x86)\Everything`、`PATH`，最后使用插件内置的 `es.exe`。 |
 | `maxResults` | `50` | 单次搜索最多返回的路径数（1–1000）。 |
 | `timeoutMs` | `15000` | 单次 `es` 查询的最长运行时间，超时视为失败（1–120000 毫秒）。 |
 

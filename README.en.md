@@ -66,7 +66,7 @@ Open **Plugins → Installed plugins → Everything search → Configure**:
 
 | Field | Default | Description |
 |---|---|---|
-| `esPath` | empty | Explicit `es.exe` path (`D:/...` or Git Bash-style `/d/...`). When set, only this path is used. When empty, the plugin tries the usual Windows Program Files locations, `D:\Program Files\Everything`, `C:\Program Files\Everything`, `C:\Program Files (x86)\Everything`, then `PATH`, and finally the architecture-matched bundled `es.exe`. |
+| `esPath` | empty | Explicit `es.exe` path (`D:/...` or Git Bash-style `/d/...`). When set, only this path is used. When empty, the plugin tries the usual Windows Program Files locations, `D:\Program Files\Everything`, `C:\Program Files\Everything`, `D:\Program Files (x86)\Everything`,  `C:\Program Files (x86)\Everything`, then `PATH`, and finally the architecture-matched bundled `es.exe`. |
 | `maxResults` | `50` | Maximum number of paths returned by one search (1–1000). |
 | `timeoutMs` | `15000` | Maximum runtime of one `es` query; exceeding it is treated as a failure (1–120000 ms). |
 
