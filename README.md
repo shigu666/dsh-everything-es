@@ -17,7 +17,6 @@
 - 要搜索的磁盘和目录已加入 Everything 索引。
 - 插件自带按 CPU 架构选择的 `es.exe` 回退；也可以使用本机已安装的 Everything CLI。无论使用哪个
   `es.exe`，Everything 本体都必须在本机安装并运行。
-- 支持 DSH `>=0.2.1-rc.5 <0.3.0`。
 
 ## 功能
 

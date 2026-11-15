@@ -18,7 +18,6 @@ from the Everything index; it never reads file contents. Use `rg` or `grep` for 
 - The drives and folders you want to search are already indexed by Everything.
 - The plugin bundles architecture-matched `es.exe` fallbacks, and it can also use an existing
   Everything CLI installation. Either way, Everything itself must be installed and running locally.
-- Supported DSH versions: `>=0.2.1-rc.5 <0.3.0`.
 
 ## Features
 

@@ -1,6 +1,7 @@
 {
   "meta": {
     "title": "Everything search",
-    "description": "Adds a Windows-only search_files tool that looks up file and folder names through Everything's es CLI. Requires Everything to be installed and running on the local machine."
+    "description": "Adds a Windows-only search_files tool that looks up file and folder names through Everything's es CLI. Requires Everything to be installed and running on the local machine.",
+    "detail": "docs/DETAIL.md"
   }
 }

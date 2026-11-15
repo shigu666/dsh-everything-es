@@ -38,6 +38,7 @@
     "lib/run-es.js",
     "lib/es/*/es.exe",
     "lib/es/README.md",
+    "docs",
     "locale/*.json",
     "icon.svg"
   ],
@@ -53,9 +54,6 @@
         "@deepseek-ai/dsh-client-ui-plugin-manager"
       ]
     }
-  },
-  "engines": {
-    "dsh": ">=0.2.1-rc.5 <0.3.0"
   },
   "scripts": {
     "test": "node --test",
