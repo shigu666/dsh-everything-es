@@ -54,8 +54,8 @@ The same values can be set in the profile patch:
 `search_files({ query, path?, max_results? })`
 
 - `query` — Everything syntax (`package.json`, `*.ts`, `ext:md README`, `regex:` etc.).
-- `path` — optional folder to restrict the search; defaults to the current Session working directory.
-  Relative paths resolve against that directory.
+- `path` — optional folder to restrict the search. Omit it to search the entire Everything index; a relative
+  path resolves against the current Session working directory.
 - `max_results` — per-call override of the setting.
 
 Returns one full Windows path per line. When the result cap is reached, the result is marked as truncated
@@ -69,8 +69,9 @@ installation** (through its entry script) instead of declaring a dependency tree
 dependency-free and works whether it is linked from a directory or installed from npm.
 
 Searches run through the Host's `ctx.subprocess` service, so they use the same environment scrubbing,
-managed process termination, and output policy as built-in tools. The effective search root comes from
-`ctx.workingDirectory.ensure()`, not the immutable session creation directory.
+managed process termination, and output policy as built-in tools. The effective session working directory
+is used as the child process cwd and as the base for relative `path` filters; omitting `path` leaves the
+search unrestricted across the Everything index.
 
 Everything writes stdout using the Windows ANSI code page. To preserve non-ASCII paths, the plugin asks
 `es.exe` to export the result to a private temporary file with `-utf8-bom`, reads that file as UTF-8, and

@@ -13,10 +13,10 @@
  * execution and the effective working directory use the Host's services so the
  * tool follows the same subprocess policy as built-in tools.
  */
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { nativePath, positiveInt } from './lib/core.js';
+import { positiveInt, resolveSearchRoot } from './lib/core.js';
 import { resolveEs } from './lib/resolve-es.js';
 import { searchEverything } from './lib/run-es.js';
 
@@ -61,13 +61,6 @@ function valueOf(field, fallback) {
   return field ?? fallback;
 }
 
-/** Resolve an optional relative model path against the session workdir. */
-function resolveSearchRoot(path, workdir) {
-  if (typeof path !== 'string' || path.trim() === '') return workdir;
-  const normalized = nativePath(path);
-  return isAbsolute(normalized) ? normalized : resolve(workdir, normalized);
-}
-
 /** Register `search_files` when Everything is usable on this platform. */
 export function apply(ctx, rawConfig = {}) {
   if (process.platform !== 'win32') return;
@@ -91,7 +84,7 @@ export function apply(ctx, rawConfig = {}) {
         path: {
           type: 'string',
           description:
-            'Optional folder to restrict the search to. Defaults to the current Session working directory. Absolute Windows paths and /d/... Git Bash paths are accepted.',
+            'Optional folder to restrict the search to. Omit it to search the entire Everything index. Absolute Windows paths and /d/... Git Bash paths are accepted; relative paths resolve against the current Session working directory.',
         },
         max_results: {
           type: 'number',

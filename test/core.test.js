@@ -9,6 +9,7 @@ import {
   nativePath,
   parseExportedPaths,
   positiveInt,
+  resolveSearchRoot,
 } from '../lib/core.js';
 
 test('literalSearchArg preserves normal Everything syntax', () => {
@@ -44,6 +45,15 @@ test('buildEsArgs keeps query as the final literal argument', () => {
   assert.equal(args.length, 8);
   assert.equal(args.at(-1), '"-export-txt=C:/tmp/evil.txt"');
   assert.equal(args.filter((arg) => arg === '-export-txt').length, 1);
+});
+
+test('buildEsArgs omits -path when no search root is supplied', () => {
+  const args = buildEsArgs({
+    limit: 25,
+    exportPath: 'C:/tmp/results.txt',
+    query: 'java.exe',
+  });
+  assert.deepEqual(args, ['-n', '25', '-export-txt', 'C:/tmp/results.txt', '-utf8-bom', 'java.exe']);
 });
 
 test('parseExportedPaths strips BOM and CRLF but preserves path whitespace', () => {
@@ -94,6 +104,17 @@ test('bundledEsCandidates builds architecture-specific es.exe paths', () => {
   assert.equal(candidates.length, 2);
   assert.match(candidates[0], /arm64[\\/]es\.exe$/u);
   assert.match(candidates[1], /x64[\\/]es\.exe$/u);
+});
+
+test('resolveSearchRoot omits the filter for a global search', () => {
+  assert.equal(resolveSearchRoot(undefined, 'C:/work'), undefined);
+  assert.equal(resolveSearchRoot('', 'C:/work'), undefined);
+  assert.equal(resolveSearchRoot('   ', 'C:/work'), undefined);
+});
+
+test('resolveSearchRoot resolves explicit relative filters against the workdir', () => {
+  const resolved = resolveSearchRoot('src', 'C:/work');
+  assert.match(resolved, /work[\\/]src$/u);
 });
 
 test('nativePath converts Git Bash drive paths on Windows', () => {
