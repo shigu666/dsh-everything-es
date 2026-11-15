@@ -74,10 +74,9 @@ const field = value !== null && typeof value === "object" ? value[name] : undefi
 return field === undefined || field === null ? "" : String(field);
 }
 
-/** Whether the user layer explicitly overrides one field. */
-function overridden(snapshot, name) {
-const user = snapshot.user;
-return user !== null && typeof user === "object" && Object.prototype.hasOwnProperty.call(user, name);
+/** The set of fields the user layer explicitly overrides. */
+function overriddenSet(user) {
+return new Set(user !== null && typeof user === "object" ? Object.keys(user) : []);
 }
 
 /** Draft values from the latest accepted Host section. */
@@ -97,6 +96,46 @@ if (field.kind === "text") return { kind: "set", value: trimmed };
 const value = Number(trimmed);
 if (!Number.isInteger(value) || value < field.min || value > field.max) return { kind: "invalid" };
 return { kind: "set", value };
+}
+
+/**
+ * Build one atomic settings mutation from the staged draft.
+ *
+ * Only fields the user touched are included. Resetting an overridden field
+ * emits an unset; leaving a non-overridden field blank emits nothing.
+ *
+ * @param {object} snapshot accepted form snapshot
+ * @param {Record<string, string>} draft current field text
+ * @param {Record<string, { reset: boolean }>} touched fields edited in this draft
+ * @param {Set<string>} overrides fields currently present in the user layer
+ * @returns {{ invalid: boolean, ops: object[], effective: Record<string, string>, overrides: Set<string> }}
+ */
+function buildMutation(snapshot, draft, touched, overrides) {
+const ops = [];
+const effective = draftFrom(snapshot.value);
+const remaining = new Set(overrides);
+for (const field of FIELDS) {
+const change = touched[field.name];
+if (change === undefined) continue;
+const parsed = parseField(field, draft[field.name]);
+if (parsed.kind === "invalid") return { invalid: true, ops: [], effective, overrides: remaining };
+const isOverridden = remaining.has(field.name);
+const cleared = change.reset || parsed.kind === "unset";
+if (cleared) {
+if (isOverridden) {
+ops.push({ op: "unset", path: [field.name] });
+remaining.delete(field.name);
+}
+effective[field.name] = fieldText(snapshot.base, field.name);
+continue;
+}
+effective[field.name] = String(parsed.value);
+if (fieldText(snapshot.value, field.name) !== String(parsed.value) || isOverridden) {
+ops.push({ op: "set", path: [field.name], value: parsed.value });
+remaining.add(field.name);
+}
+}
+return { invalid: false, ops, effective, overrides: remaining };
 }
 
 const inputStyle = {
@@ -120,9 +159,9 @@ cursor: "pointer"
 };
 
 /** Render one labelled input row. */
-function FieldRow({ t, form, snapshot, field, draft, disabled, onEdit, onReset }) {
+function FieldRow({ t, form, snapshot, field, draft, touched, overrides, disabled, onEdit, onReset }) {
 const value = draft[field.name];
-const reset = overridden(snapshot, field.name);
+const reset = overrides.has(field.name) && touched[field.name]?.reset !== true;
 return h(
 "div",
 { style: { display: "grid", gap: 4 } },
@@ -155,23 +194,27 @@ reset && h("div", { style: { fontSize: 12, opacity: 0.72 } }, t("overridden"))
 );
 }
 
-/** Render the settings card or its one-line summary. */
+/** Render the settings page or its one-line summary. */
 function EverythingCard(props) {
 const { t, form } = props;
-const subscribe = React.useMemo(() => form.subscribe.bind(form), [form]);
-const getSnapshot = React.useMemo(() => form.getSnapshot.bind(form), [form]);
-const snapshot = React.useSyncExternalStore(subscribe, getSnapshot);
-const [draft, setDraft] = React.useState(() => draftFrom(undefined));
+const snapshot = form?.state;
+const [draft, setDraft] = React.useState(() => draftFrom(snapshot?.value));
+const [touched, setTouched] = React.useState({});
+const [overrides, setOverrides] = React.useState(() => overriddenSet(snapshot?.user));
 const [dirty, setDirty] = React.useState(false);
 const [saving, setSaving] = React.useState(false);
 const [failed, setFailed] = React.useState(false);
 const [error, setError] = React.useState("");
 
 React.useEffect(() => {
-if (!dirty && snapshot.status === "ready") setDraft(draftFrom(snapshot.value));
-}, [snapshot.revision, snapshot.status, dirty]);
+if (!dirty && snapshot?.status === "ready") {
+setDraft(draftFrom(snapshot.value));
+setOverrides(overriddenSet(snapshot.user));
+}
+}, [snapshot?.revision, snapshot?.status, dirty]);
 
 if (props.view === "summary") return t("description");
+if (snapshot === undefined) return h("p", { style: { margin: 0, opacity: 0.72 } }, t("unavailable"));
 if (snapshot.status === "loading") return h("p", { style: { margin: 0, opacity: 0.72 } }, t("loading"));
 if (snapshot.status === "unavailable") return h("p", { style: { margin: 0, opacity: 0.72 } }, t("unavailable"));
 
@@ -179,6 +222,7 @@ const disabled = !snapshot.writable || saving;
 
 const edit = (name, text) => {
 setDraft((previous) => ({ ...previous, [name]: text }));
+setTouched((previous) => ({ ...previous, [name]: { reset: false } }));
 setDirty(true);
 setFailed(false);
 setError("");
@@ -186,8 +230,8 @@ setError("");
 
 const save = async () => {
 if (disabled || !dirty) return;
-const parsed = FIELDS.map((field) => ({ field, result: parseField(field, draft[field.name]) }));
-if (parsed.some(({ result }) => result.kind === "invalid")) {
+const mutation = buildMutation(snapshot, draft, touched, overrides);
+if (mutation.invalid) {
 setFailed(true);
 setError(t("invalidNumber"));
 return;
@@ -196,16 +240,17 @@ setSaving(true);
 setFailed(false);
 setError("");
 try {
-for (const { field, result } of parsed) {
-const accepted = result.kind === "unset"
-? await form.unset(field.name)
-: await form.set(field.name, result.value);
+if (mutation.ops.length > 0) {
+const accepted = await form.mutate(mutation.ops, snapshot.revision);
 if (!accepted) {
 setFailed(true);
 setError(t("saveFailed"));
 return;
 }
 }
+setDraft(mutation.effective);
+setOverrides(mutation.overrides);
+setTouched({});
 setDirty(false);
 } catch (cause) {
 setFailed(true);
@@ -216,7 +261,9 @@ setSaving(false);
 };
 
 const discard = () => {
-setDraft(draftFrom(form.getSnapshot().value));
+setDraft(draftFrom(snapshot.value));
+setTouched({});
+setOverrides(overriddenSet(snapshot.user));
 setDirty(false);
 setFailed(false);
 setError("");
@@ -224,6 +271,7 @@ setError("");
 
 const resetField = (name) => {
 setDraft((previous) => ({ ...previous, [name]: "" }));
+setTouched((previous) => ({ ...previous, [name]: { reset: true } }));
 setDirty(true);
 setFailed(false);
 setError("");
@@ -240,6 +288,8 @@ form,
 snapshot,
 field,
 draft,
+touched,
+overrides,
 disabled,
 onEdit: edit,
 onReset: resetField
@@ -260,33 +310,31 @@ failed && h("p", { role: "alert", style: { margin: 0, color: "var(--dsw-alias-da
 const inject = ["slots", "locale", "configForms"];
 /** Loader entry id of the Host row; also the settings namespace. */
 const ENTRY = "everything-search";
-/** Plugins-page card id. */
-const CARD_ID = "everything-search";
+/** Package name is half of the row configuration key. */
+const PACKAGE_NAME = "dsh-everything-es";
+/** The Plugins page keys a row's form by `<package>#<row id>`. */
+const ROW_CONFIG_KEY = `${PACKAGE_NAME}#${ENTRY}`;
 
-/** Mount the settings card while the Host serves its namespace. */
+/** Mount the row configuration while the Host serves its namespace. */
 function apply(ctx) {
 const t = ctx.locale.bind(NS);
 ctx.effect(() => ctx.locale.register(NS, { zh, en }), "everything-search: dictionaries");
-const form = ctx.configForms.get(ENTRY);
-ctx.effect(() => () => { void form.dispose(); }, "everything-search: form subscription");
 ctx.effect(
 () =>
 ctx.configForms.whileServed([ENTRY], () =>
-ctx.slots.inject("plugins.item", () =>
+ctx.slots.inject("plugins.row.config", () =>
 ctx.slots.register(
 {
-name: "plugins.item",
-id: CARD_ID,
-order: 60,
-label: () => t("title"),
+name: "plugins.row.config",
+key: ROW_CONFIG_KEY,
 locale: NS,
-inject: () => ({ form })
+inject: () => ({})
 },
 EverythingCard
 )
 )
 ),
-"everything-search: card"
+"everything-search: row configuration"
 );
 }
 //#endregion
@@ -294,6 +342,7 @@ EverythingCard
 exports.NS = NS;
 exports.apply = apply;
 exports.inject = inject;
+exports.__test = { buildMutation, draftFrom, parseField };
 return module.exports;
 }
 });

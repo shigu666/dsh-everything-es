@@ -1,6 +1,6 @@
 {
   "name": "dsh-everything-es",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Fast file-name search for DeepSeek Harness on Windows through Everything's es CLI.",

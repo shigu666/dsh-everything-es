@@ -29,7 +29,7 @@ The plugin is Windows-only; on other platforms it registers no tool.
 
 ## Settings
 
-**Plugins → Built-in plugin settings → Everything search**:
+**Plugins → Installed plugins → Everything 搜索 → 配置 Everything 搜索** (the row's configure page):
 
 | Field | Default | Meaning |
 |---|---|---|

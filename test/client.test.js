@@ -13,14 +13,8 @@ await import('../client.js');
 
 const React = {
   createElement(type, props, ...children) {
-    const input = { ...props, children };
+    const input = { ...props, children: children.flat() };
     return typeof type === 'function' ? type(input) : { type, props: input };
-  },
-  useMemo(factory) {
-    return factory();
-  },
-  useSyncExternalStore(_subscribe, getSnapshot) {
-    return getSnapshot();
   },
   useState(initial) {
     return [typeof initial === 'function' ? initial() : initial, () => {}];
@@ -29,43 +23,37 @@ const React = {
 };
 
 function createForm() {
-  const snapshot = {
+  const state = {
     status: 'ready',
     value: { esPath: 'D:/Everything/es.exe', maxResults: 50, timeoutMs: 15000 },
-    base: {},
+    base: { esPath: '', maxResults: 50, timeoutMs: 15000 },
     user: { maxResults: 50 },
-    revision: 1,
+    revision: 7,
     writable: true,
   };
   return {
-    snapshot,
-    getSnapshot() {
-      return snapshot;
-    },
-    subscribe() {
-      return () => {};
-    },
-    async set() {
+    state,
+    async mutate() {
       return true;
     },
-    async unset() {
-      return true;
-    },
-    async dispose() {},
   };
 }
 
-test('client loads without private Harness UI primitives and gates the card on served state', () => {
-  assert.equal(loaded?.id, 'dsh-everything-es');
-  const module = loaded.factory((name) => {
+function loadFactory() {
+  return loaded.factory((name) => {
     if (name === 'react') return React;
     throw new Error(`unexpected client module: ${name}`);
   });
+}
+
+test('client registers the bundle row configuration used by the current Plugins page', () => {
+  assert.equal(loaded?.id, 'dsh-everything-es');
+  const module = loadFactory();
   assert.deepEqual(module.inject, ['slots', 'locale', 'configForms']);
 
   const form = createForm();
   let locale;
-  let card;
+  let rowConfig;
   let observedServed;
   const ctx = {
     locale: {
@@ -78,10 +66,6 @@ test('client loads without private Harness UI primitives and gates the card on s
       },
     },
     configForms: {
-      get(id) {
-        assert.equal(id, 'everything-search');
-        return form;
-      },
       whileServed(namespaces, register) {
         observedServed = namespaces;
         return register(new Set(namespaces));
@@ -89,11 +73,11 @@ test('client loads without private Harness UI primitives and gates the card on s
     },
     slots: {
       inject(name, callback) {
-        assert.equal(name, 'plugins.item');
+        assert.equal(name, 'plugins.row.config');
         return callback();
       },
       register(options, component) {
-        card = { options, component };
+        rowConfig = { options, component };
         return () => {};
       },
     },
@@ -109,20 +93,58 @@ test('client loads without private Harness UI primitives and gates the card on s
   assert.equal(locale.namespace, 'settings.everythingSearch');
   assert.ok(locale.dictionaries.en.title);
   assert.deepEqual(observedServed, ['everything-search']);
-  assert.equal(card.options.id, 'everything-search');
-  assert.equal(card.options.inject().form, form);
+  assert.equal(rowConfig.options.name, 'plugins.row.config');
+  assert.equal(rowConfig.options.key, 'dsh-everything-es#everything-search');
+  assert.equal(rowConfig.options.locale, 'settings.everythingSearch');
 
-  const summary = card.component({
+  const summary = rowConfig.component({
     view: 'summary',
     t: (key) => key,
     form,
   });
   assert.equal(summary, 'description');
 
-  const rendered = card.component({
-    view: 'form',
+  const rendered = rowConfig.component({
+    view: 'page',
     t: (key) => key,
     form,
   });
   assert.equal(rendered.type, 'div');
+});
+
+test('buildMutation writes only staged fields and unsets reset overrides', () => {
+  const { buildMutation } = loadFactory().__test;
+  const snapshot = {
+    value: { esPath: 'D:/Everything/es.exe', maxResults: 50, timeoutMs: 15000 },
+    base: { esPath: '', maxResults: 50, timeoutMs: 15000 },
+  };
+  const draft = { esPath: '', maxResults: '100', timeoutMs: '15000' };
+  const touched = {
+    esPath: { reset: true },
+    maxResults: { reset: false },
+  };
+  const mutation = buildMutation(snapshot, draft, touched, new Set(['esPath', 'maxResults']));
+  assert.equal(mutation.invalid, false);
+  assert.deepEqual(mutation.ops, [
+    { op: 'unset', path: ['esPath'] },
+    { op: 'set', path: ['maxResults'], value: 100 },
+  ]);
+  assert.equal(mutation.effective.esPath, '');
+  assert.equal(mutation.effective.maxResults, '100');
+  assert.deepEqual([...mutation.overrides], ['maxResults']);
+});
+
+test('buildMutation rejects out-of-range numbers without producing writes', () => {
+  const { buildMutation } = loadFactory().__test;
+  const mutation = buildMutation(
+    {
+      value: { esPath: '', maxResults: 50, timeoutMs: 15000 },
+      base: { esPath: '', maxResults: 50, timeoutMs: 15000 },
+    },
+    { esPath: '', maxResults: '0', timeoutMs: '15000' },
+    { maxResults: { reset: false } },
+    new Set(),
+  );
+  assert.equal(mutation.invalid, true);
+  assert.deepEqual(mutation.ops, []);
 });
